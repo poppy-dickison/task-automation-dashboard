@@ -1,0 +1,21 @@
+node_modules
+dist
+build
+.DS_Store
+
+# env
+.env
+.env.*.local
+
+# logs
+*.log
+
+# prisma / sqlite
+*.db
+*.db-journal
+
+# vite
+apps/web/.vite
+
+# misc
+coverage
