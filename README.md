@@ -17,7 +17,7 @@ Built as a portfolio project to demonstrate full-stack TypeScript: React fronten
 ## Running locally
 
 ### Prereqs
-- Node.js (your standard dev install)
+- Node.js
 - npm
 
 ### Install
