@@ -28,3 +28,7 @@ export interface RunLogDto {
     level: 'info' | 'warn' | 'error';
     message: string;
 }
+
+export type TaskWithRunsDto = TaskDefinitionDto & {
+    runs: RunDto[];
+};

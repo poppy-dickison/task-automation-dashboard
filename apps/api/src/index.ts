@@ -15,7 +15,7 @@ import session from 'express-session';
 import pinoHttp from 'pino-http';
 import { logger } from './config/logger';
 import { prisma } from './lib/prisma';
-import type { TaskDefinitionDto } from '@tad/shared';
+import type { TaskWithRunsDto } from '@tad/shared';
 
 const app = express();
 
@@ -54,13 +54,26 @@ app.get('/health', (req, res) => {
  */
 app.get('/tasks', async (req, res) => {
     const tasks = await prisma.taskDefinition.findMany({
-        orderBy: { key: 'asc' }
+        orderBy: { key: 'asc' },
+        include: {
+            runs: {
+                orderBy: { createdAt: 'desc' }, take: 5,
+            }
+        }
     });
 
-    const dto: TaskDefinitionDto[] = tasks.map(t => ({
+    const dto: TaskWithRunsDto[] = tasks.map(t => ({
         key: t.key,
         name: t.name,
-        description: t.description
+        description: t.description,
+        runs: t.runs.map(r => ({
+            id: r.id,
+            taskKey: r.taskKey,
+            status: r.status as any,
+            createdAt: r.createdAt.toISOString(),
+            startedAt: r.startedAt ? r.startedAt.toISOString() : null,
+            finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null
+        }))
     }));
 
     res.json(dto);
@@ -78,17 +91,11 @@ app.get('/tasks', async (req, res) => {
 app.post('/runs', async (req, res) => {
     const { taskKey } = req.body as { taskKey?: string };
 
-    if (!taskKey) {
-        return res.status(400).json({ error: 'taskKey is required' });
-    }
+    if (!taskKey) return res.status(400).json({ error: 'taskKey is required' });
 
-    // validate task exists
     const task = await prisma.taskDefinition.findUnique({ where: { key: taskKey } });
-    if (!task) {
-        return res.status(404).json({ error: 'task not found' });
-    }
+    if (!task) return res.status(404).json({ error: 'task not found' });
 
-    // for now, hardcode a user
     const user = await prisma.user.upsert({
         where: { email: 'dev@local' },
         update: {},
@@ -96,14 +103,84 @@ app.post('/runs', async (req, res) => {
     });
 
     const run = await prisma.run.create({
-        data: {
-            taskKey,
-            userId: user.id,
-            status: 'queued'
-        }
+        data: { taskKey, userId: user.id, status: 'queued' }
     });
 
-    res.status(201).json(run);
+    // Log: queued
+    await prisma.runLog.create({
+        data: { runId: run.id, level: 'info', message: 'Queued' }
+    });
+
+    // After a short delay, mark running + log
+    setTimeout(async () => {
+        try {
+            await prisma.run.update({
+                where: { id: run.id },
+                data: { status: 'running', startedAt: new Date() }
+            });
+
+            await prisma.runLog.create({
+                data: { runId: run.id, level: 'info', message: 'Started' }
+            });
+
+            await prisma.runLog.create({
+                data: { runId: run.id, level: 'info', message: 'Performing task steps…' }
+            });
+        } catch (e) {
+            // swallow errors (dev only)
+        }
+    }, 300);
+
+    // After longer delay, mark success + log
+    setTimeout(async () => {
+        try {
+            await prisma.run.update({
+                where: { id: run.id },
+                data: { status: 'success', finishedAt: new Date() }
+            });
+
+            await prisma.runLog.create({
+                data: { runId: run.id, level: 'info', message: 'Finished successfully' }
+            });
+        } catch (e) {
+            // swallow errors (dev only)
+        }
+    }, 1500);
+
+    // Respond immediately (don’t wait for timeouts)
+    res.status(201).json({
+        id: run.id,
+        taskKey: run.taskKey,
+        status: run.status,
+        createdAt: run.createdAt.toISOString(),
+        startedAt: null,
+        finishedAt: null
+    });
+});
+
+app.get('/runs/:id', async (req, res) => {
+    const run = await prisma.run.findUnique({
+        where: { id: req.params.id },
+        include: { logs: { orderBy: { ts: 'asc' } } }
+    });
+
+    if (!run) return res.status(404).json({ error: 'run not found' });
+
+    res.json({
+        id: run.id,
+        taskKey: run.taskKey,
+        status: run.status,
+        createdAt: run.createdAt.toISOString(),
+        startedAt: run.startedAt ? run.startedAt.toISOString() : null,
+        finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
+        logs: run.logs.map(l => ({
+            id: l.id,
+            runId: l.runId,
+            ts: l.ts.toISOString(),
+            level: l.level,
+            message: l.message
+        }))
+    });
 });
 
 app.get('/favicon.ico', (req, res) => res.status(204).end());
