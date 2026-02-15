@@ -3,6 +3,12 @@
 A small internal-style dashboard for triggering automation tasks and tracking execution history.
 Built as a portfolio project to demonstrate full-stack TypeScript using a React frontend and a Node/Express API.
 
+## Why this project exists
+
+This project was built to demonstrate how a lightweight internal automation dashboard
+can be structured using modern TypeScript across frontend and backend. It focuses on
+clarity, shared types, and traceable task execution rather than production-scale concerns.
+
 ## Features
 
 - List available task definitions
