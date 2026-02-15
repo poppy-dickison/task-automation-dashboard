@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tad/shared": "0.0.0",
+    "@tad/shared": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

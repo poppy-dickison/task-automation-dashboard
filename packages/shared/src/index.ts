@@ -1,3 +1,9 @@
+/**
+ * Shared DTOs used by both the API and web app.
+ *
+ * Keeping these types in one place ensures the frontend and backend
+ * stay in sync as the data model evolves.
+ */
 export type RunStatus = 'queued' | 'running' | 'success' | 'failed';
 
 export interface TaskDefinitionDto {
